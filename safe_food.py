@@ -48,7 +48,8 @@ FONT_HEIGHT_TITLE = FONT_SIZE_TITLE + 1
 FONT_HEIGHT_MAIN = FONT_SIZE_MAIN + 5
 
 PERIOD_LOCK_DAY = 3
-PERIOD_LOCK_SEC = PERIOD_LOCK_DAY * 24 * 60 * 60
+# PERIOD_LOCK_SEC = PERIOD_LOCK_DAY * 24 * 60 * 60
+PERIOD_LOCK_SEC = 20
 # PERIOD_GUARD_SEC = 5 * 60
 PERIOD_GUARD_SEC = 2
 PERIOD_LOCKING_SEC = 10
@@ -62,6 +63,9 @@ font = ImageFont.truetype("/usr/share/fonts/truetype/unfonts-core/UnDinaruLight.
 font_title = ImageFont.truetype("/usr/share/fonts/truetype/unfonts-core/UnGraphicBold.ttf", FONT_SIZE_TITLE)
 
 TITLE = "간식창고:승승장구"
+
+
+ALERT_SILICA_GEL_DIFF = 20
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
@@ -131,12 +135,22 @@ def wrap_text(text):
 
     return wrapped_lines
 
+
+def do_change_silica_gel():
+    if temp_sensor_external.humidity is None or temp_sensor_internal.humidity is None:
+        return False
+
+    if temp_sensor_external.humidity - temp_sensor_internal.humidity < ALERT_SILICA_GEL_DIFF:
+        return True
+    else:
+        return False
+
+
 def disp_title():
     draw.rectangle((0, 0, width, height), outline=0, fill=0)
     draw.text((0, 0), f"{TITLE} ({datetime.now().strftime('%y%m%d / %H:%M:%S')})", font=font_title, fill="#FFFFFF")
     
-def disp_main():
-    
+def disp_main():    
     try:
         disp_title()
 
@@ -146,9 +160,16 @@ def disp_main():
 
         if temp_sensor_internal.temperature is not None and temp_sensor_internal.humidity is not None:
             draw.text((0, FONT_HEIGHT_MAIN), text_temperature_humidity, font=font, fill="#FFFFFF")
-    
+        
+        
+        if do_change_silica_gel():
+            text_change_silica_gel = f"실리카겔 교체 알림: 교체 필요"
+            draw.text((0, FONT_HEIGHT_MAIN * 2), text_change_silica_gel, font=font, fill="#FF0000")
+        else:
+            text_change_silica_gel = f"실리카겔 교체 알림: 교체 불필요"
+            draw.text((0, FONT_HEIGHT_MAIN * 2), text_change_silica_gel, font=font, fill="#FFFFFF")
+
         if box.isOpen == True:
-            # text_box_remaining = f"간식 창고를 열수 있습니다."
             text_box_remaining = f"간식 창고가 열려있습니다."
         else:
             if box.is_unlockable() == True:
@@ -157,17 +178,13 @@ def disp_main():
                 text_box_remaining = f"남은시간: {box.get_remaining_time()}"
 
         # text_box_remaining = f"남은시간: {box.get_remaining_time()}"
-        draw.text((0, FONT_HEIGHT_MAIN * 2), text_box_remaining, font=font, fill="#FFFFFF")
-
-        text_box_open = f"상자열림: {box.isOpen}"
-        draw.text((0, FONT_HEIGHT_MAIN * 3), text_box_open, font=font, fill="#FFFFFF")
+        draw.text((0, FONT_HEIGHT_MAIN * 3), text_box_remaining, font=font, fill="#FFFFFF")
 
         text_box_content = f"간식 종류: {box.content}"
         draw.text((0, FONT_HEIGHT_MAIN * 4), text_box_content, font=font, fill="#FFFFFF")
 
         text_box_content_desc = f"{box.content_desc}"
         wrapped_text_box_content_desc = wrap_text(text_box_content_desc)
-        # draw.text((0, FONT_HEIGHT_MAIN * 5), text_box_content_desc, font=font, fill="#FFFFFF")
 
         for i, line in enumerate(wrapped_text_box_content_desc):
             draw.text((0, FONT_HEIGHT_MAIN * ( 5 + i ) ), line, font=font, fill="#FFFFFF")
@@ -566,7 +583,6 @@ class TimeLockedBox:
 unlock_date = datetime.now() + timedelta(seconds=PERIOD_LOCK_SEC)
 box = TimeLockedBox("간식", "일이삼사오육111칠팔구십1234567890일이삼사1111오육1칠1팔구십1234567890", unlock_date)
 assistant = FoodAssistant()
-
 
 try:
     while True:
