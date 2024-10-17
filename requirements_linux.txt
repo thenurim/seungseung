@@ -1,0 +1,6 @@
+pyaudio
+openai
+soundfile
+numpy 
+pynput
+sounddevice
