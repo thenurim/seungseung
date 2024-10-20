@@ -19,6 +19,13 @@ sudo apt install libopenblas-dev
 pip instal numpy
 ```
 
+## 실행하기
+- python 실행
+```
+# source venv/bin/activate
+# python ili.py
+```
+
 ## 사운드 설정
 - 스피커 테스트
 $ arecord --format=S16_LE --duration=5 --rate=16000 --file-type=raw out.raw
