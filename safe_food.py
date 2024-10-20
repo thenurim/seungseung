@@ -89,7 +89,7 @@ temp_sensor_external = adafruit_dht.DHT11(board.D24)
 spi = busio.SPI(clock=board.SCK, MOSI=board.MOSI, MISO=board.MISO)
 
 # Create the ILI9341 display:
-disp = ili9341.ILI9341(spi, cs=cs_pin, dc=dc_pin, rst=rst_pin, baudrate=BAUDRATE, rotation=90)
+disp = ili9341.ILI9341(spi, cs=cs_pin, dc=dc_pin, rst=rst_pin, baudrate=BAUDRATE, rotation=270)
 
 if disp.rotation % 180 == 90:
     height = disp.width  # we swap height/width to rotate it to landscape!
