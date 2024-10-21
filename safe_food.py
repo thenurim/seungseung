@@ -13,7 +13,7 @@ import busio
 import digitalio
 import board
 import subprocess
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageSequence
 from adafruit_rgb_display.rgb import color565
 from adafruit_rgb_display import ili9341
 import adafruit_dht 
@@ -63,10 +63,34 @@ font_title = ImageFont.truetype("/usr/share/fonts/truetype/unfonts-core/UnGraphi
 
 TITLE = "간식창고:승승장구"
 
-
-ALERT_SILICA_GEL_DIFF = 20
+ALERT_SILICA_GEL_DIFF = 10
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
+
+TARGET_FPS = 15
+GIF_IMAGE_SIZE = 150
+gif_image_lock_close = Image.open("lock_close.gif")
+gif_image_lock_open = Image.open("lock_open.gif")
+
+gif_duration_lock_close = gif_image_lock_close.info.get('duration', 100)
+gif_duration_lock_open = gif_image_lock_open.info.get('duration', 100)
+
+original_fps_lock_close = 1000 / gif_duration_lock_close
+original_fps_lock_open = 1000 / gif_duration_lock_close
+
+frame_interval_lock_close = int(original_fps_lock_close / TARGET_FPS)
+frame_interval_lock_open = int(original_fps_lock_open / TARGET_FPS)
+
+gif_frames_lock_close = []
+for i, frame in enumerate(ImageSequence.Iterator(gif_image_lock_close)):
+    if i % frame_interval_lock_close == 0:
+        gif_frames_lock_close.append(frame.copy().convert("RGB").resize((GIF_IMAGE_SIZE, GIF_IMAGE_SIZE), Image.LANCZOS))
+
+gif_frames_lock_open = []
+for i, frame in enumerate(ImageSequence.Iterator(gif_image_lock_open)):
+    if i % frame_interval_lock_close == 0:
+        gif_frames_lock_open.append(frame.copy().convert("RGB").resize((GIF_IMAGE_SIZE, GIF_IMAGE_SIZE), Image.LANCZOS))
+
 
 # Configuratoin for CS and DC pins (these are FeatherWing defaults on M0/M4):
 cs_pin = digitalio.DigitalInOut(board.CE0)
@@ -192,26 +216,6 @@ def disp_main():
 
     disp.image(image)
 
-
-def disp_lock():
-    try:
-        disp_title()
-
-        text_state = f"현재 열려있는 상태입니다.."
-        text_lock = f"간식 창고를 잠그겠습니다."
-        text_target_day = f"{PERIOD_LOCK_SEC / 24 / 60 / 60}일 뒤에 열 수 있습니다."
-        text_guard = f"{PERIOD_GUARD_SEC / 60}분 내에는 다시 열 수 있습니다."
-
-        draw.text((0, FONT_HEIGHT_MAIN), text_state, font=font, fill="#FFFFFF")
-        draw.text((0, FONT_HEIGHT_MAIN * 2), text_lock, font=font, fill="#FFFFFF")
-        draw.text((0, FONT_HEIGHT_MAIN * 3), text_target_day, font=font, fill="#FFFFFF")
-        draw.text((0, FONT_HEIGHT_MAIN * 4), text_guard, font=font, fill="#FFFFFF")
-
-    except RuntimeError:
-        pass
-
-    disp.image(image)
-
 def disp_record():
     try:
         disp_title()
@@ -260,19 +264,30 @@ def disp_record_confirm():
 
     disp.image(image)
 
+count = 0
 def disp_locking():
+    global count
+    count += 1
+
     try:
         disp_title()
 
         if box.isOpen == True:  #여는중
+            current_frame = gif_frames_lock_open[count % len(gif_frames_lock_open)]
+
             text_locking = f"상자를 여는중입니다."    
         else:   #닫는중
+            current_frame = gif_frames_lock_close[count % len(gif_frames_lock_close)]
+
             text_locking = f"상자를 닫는중입니다."
 
         text_waiting = f"잠시만 기다려주세요."    
 
         draw.text((0, FONT_HEIGHT_MAIN), text_locking, font=font, fill="#FFFFFF")
         draw.text((0, FONT_HEIGHT_MAIN * 2), text_waiting, font=font, fill="#FFFFFF")
+
+        image.paste(current_frame, (0, FONT_HEIGHT_MAIN * 3))
+
 
     except RuntimeError:
         pass
@@ -283,7 +298,16 @@ def disp_ai_processing(text = ''):
     try:
         disp_title()
 
+        # if box.isOpen == True:  #여는중
+        #     text_locking = f"상자를 여는중입니다."    
+        # else:   #닫는중
+        #     text_locking = f"상자를 닫는중입니다."
+
+        # text_waiting = f"잠시만 기다려주세요."    
+
         draw.text((0, FONT_HEIGHT_MAIN), "AI가 음식을 분석하는 중입니다.", font=font, fill="#FFFFFF")
+        # draw.text((0, FONT_HEIGHT_MAIN), text_locking, font=font, fill="#FFFFFF")
+        # draw.text((0, FONT_HEIGHT_MAIN * 2), text_waiting, font=font, fill="#FFFFFF")
 
     except RuntimeError:
         pass
