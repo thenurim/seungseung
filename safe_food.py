@@ -18,8 +18,6 @@ from adafruit_rgb_display.rgb import color565
 from adafruit_rgb_display import ili9341
 import adafruit_dht 
 
-from datetime import datetime
-
 import os
 import wave
 import pyaudio
@@ -40,7 +38,7 @@ import platform
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 # Config for display baudrate (default max is 24mhz):
-BAUDRATE = 24000000
+BAUDRATE = 54000000
 
 FONT_SIZE_TITLE = 14
 FONT_SIZE_MAIN = 16
@@ -48,11 +46,12 @@ FONT_HEIGHT_TITLE = FONT_SIZE_TITLE + 1
 FONT_HEIGHT_MAIN = FONT_SIZE_MAIN + 5
 
 PERIOD_LOCK_DAY = 3
-# PERIOD_LOCK_SEC = PERIOD_LOCK_DAY * 24 * 60 * 60
-PERIOD_LOCK_SEC = 20
+PERIOD_LOCK_SEC = PERIOD_LOCK_DAY * 24 * 60 * 60
+# PERIOD_LOCK_SEC = 60
+# PERIOD_LOCK_SEC = 15
 # PERIOD_GUARD_SEC = 5 * 60
-PERIOD_GUARD_SEC = 2
-PERIOD_LOCKING_SEC = 10
+PERIOD_GUARD_SEC = 10
+PERIOD_LOCKING_SEC = 7
 
 MENU_STATE_MAIN = 1
 MENU_STATE_BOX_LOCKING = 2
@@ -175,9 +174,8 @@ def disp_main():
             if box.is_unlockable() == True:
                 text_box_remaining = f"간식 창고를 열 수 있습니다."
             else:
-                text_box_remaining = f"남은시간: {box.get_remaining_time()}"
+                text_box_remaining = f"남은시간: {box.get_remaining_time()}{'(가드중)' if box.is_guarding() else ''}"
 
-        # text_box_remaining = f"남은시간: {box.get_remaining_time()}"
         draw.text((0, FONT_HEIGHT_MAIN * 3), text_box_remaining, font=font, fill="#FFFFFF")
 
         text_box_content = f"간식 종류: {box.content}"
@@ -221,7 +219,7 @@ def disp_record():
         text_state = f"잠겨있는 상태입니다.."
 
         text_food_name = f"현재 간식: {box.content if assistant.user_input == None else assistant.user_input}"
-        text_switch_long = "스위치 길게 눌러 간식 업데이트"
+        text_switch_long = f"스위치 길게 눌러 간식 {'' if assistant.user_input == None else '다시'} 업데이트"
         text_switch_short = f"스위치 짧게 눌러 {'돌아가기' if assistant.user_input == None else '확인'}"
 
         text_switch_on_recording_started = "녹음중... 간식 내용을 말하세요."
@@ -281,7 +279,16 @@ def disp_locking():
 
     disp.image(image)
 
+def disp_ai_processing(text = ''):
+    try:
+        disp_title()
 
+        draw.text((0, FONT_HEIGHT_MAIN), "AI가 음식을 분석하는 중입니다.", font=font, fill="#FFFFFF")
+
+    except RuntimeError:
+        pass
+
+    disp.image(image)
 
 def on_switch_main():
     global menu_state
@@ -295,16 +302,18 @@ def on_switch_main():
         if box.isOpen == True:
             box.toggle()    
         else:
-            # assistant.run()
-            if box.is_unlockable() == True or  box.is_guarding() == True:
+            if box.is_unlockable() == True:
                 box.toggle()
             else:
-                assistant.run()
+                if box.is_guarding() == True:
+                    box.toggle()
+                else:
+                    assistant.run()
 
 
 class FoodAssistant:
     def __init__(self):
-        self.client = OpenAI(api_key="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")
+        self.client = OpenAI(api_key="API-KEY")
         self.CHUNK = 1024
         self.FORMAT = pyaudio.paInt16
         self.CHANNELS = 1
@@ -408,6 +417,7 @@ class FoodAssistant:
                     5. 과자나 음식의 주제에서 벗어나면 다시 질문해.
                     6. 160글자를 넘지 않도록 작성해.
                     7. 줄바꿈이나 특수문자를 사용하지 마.
+                    8. 마지막에 '승승장구'라는 말을 붙여 넣어줘.
                      """},
                     {"role": "user", "content": prompt}
                 ]
@@ -451,21 +461,8 @@ class FoodAssistant:
 
     def run(self):
         while True:
+            disp_record()
             try:
-                audio_file = self.record_audio()
-
-                if audio_file is None:
-                    return
-                
-                # debugging 다시 듣기
-                data, samplerate = sf.read(audio_file)
-                self.play_audio(data, samplerate)
-
-                self.user_input = self.speech_to_text(audio_file)
-                os.unlink(audio_file)
-                print(f"인식된 텍스트: {self.user_input}")
-                print("인식된 텍스트가 맞으면 스위치를 짧게, 다시 녹음하려면 길게 누르세요.")
-                
                 switch_press_time = 0
                 recall = False
 
@@ -492,6 +489,8 @@ class FoodAssistant:
 
                 if time.time() - switch_press_time < 0.5:
                     if assistant.user_input != None:
+                        disp_ai_processing()
+
                         prompt = f"{self.user_input}에 대해 알려주세요."
                         response = self.get_chatgpt_response(prompt)
 
@@ -504,6 +503,21 @@ class FoodAssistant:
                         self.text_to_speech(response, 1.5)
 
                     break
+                else:
+                    audio_file = self.record_audio()
+
+                    if audio_file is None:
+                        return
+                    
+                    # debugging 다시 듣기
+                    data, samplerate = sf.read(audio_file)
+                    self.play_audio(data, samplerate)
+
+                    self.user_input = self.speech_to_text(audio_file)
+                    os.unlink(audio_file)
+                    print(f"인식된 텍스트: {self.user_input}")
+                    print("인식된 텍스트가 맞으면 스위치를 짧게, 다시 녹음하려면 길게 누르세요.")
+                    
             except RuntimeError:
                 return
 
@@ -513,7 +527,7 @@ class TimeLockedBox:
     def __init__(self, content, content_desc, unlock_date):
         self.content = content
         self.content_desc = content_desc
-        self.isOpen = False
+        self.isOpen = True
         self.unlock_date = unlock_date
         self.last_closed_time = None
         self.locking_start_time = None
@@ -565,10 +579,10 @@ class TimeLockedBox:
         current_time = datetime.now()
 
         if self.last_closed_time is None or (current_time - self.last_closed_time) <= timedelta(seconds=PERIOD_GUARD_SEC):
-            print("가드타이머 적용중")
+            # print("가드타이머 적용중")
             return True
         else:
-            print("가드타이머를 벗어남")
+            # print("가드타이머를 벗어남")
             return False
 
 
@@ -581,7 +595,7 @@ class TimeLockedBox:
             print("상자를 열 수 있습니다.")
 
 unlock_date = datetime.now() + timedelta(seconds=PERIOD_LOCK_SEC)
-box = TimeLockedBox("간식", "일이삼사오육111칠팔구십1234567890일이삼사1111오육1칠1팔구십1234567890", unlock_date)
+box = TimeLockedBox("아직 보관된 간식이 없습니다.", "뭐든 보관해주세요.", unlock_date)
 assistant = FoodAssistant()
 
 try:
