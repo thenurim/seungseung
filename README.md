@@ -38,3 +38,26 @@ $ aplay --format=S16_LE --rate=16000 out.raw
 $ alsamixer
 
 - refs : https://diy-project.tistory.com/88
+
+## 지문인식
+- refs : 
+
+groups로 권한 확인
+tty가 있는지 확인.
+
+/boot/firmware/config.txt
+force_turbo=1
+arm_freq=1200
+core_freq=250
+enable_uart=1
+dtoverlay=disable-bt
+
+/boot/firmware/config.txt에서 console부분 제거
+
+리부팅하면 ttyAMA0가 생김. 권한 설정
+sudo chgrp -h tty /dev/serial0
+sudo adduser $USER tty
+sudo adduser $USER dialout
+sudo chmod g+r /dev/ttyAMA0
+- 최종 적용 실패.
+  - 제품 회사에서 C코드로 개발되어 있어 파이썬으로 포팅 필요함. 

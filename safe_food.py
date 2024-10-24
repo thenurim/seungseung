@@ -50,8 +50,8 @@ PERIOD_LOCK_SEC = PERIOD_LOCK_DAY * 24 * 60 * 60
 # PERIOD_LOCK_SEC = 60
 # PERIOD_LOCK_SEC = 15
 # PERIOD_GUARD_SEC = 5 * 60
-PERIOD_GUARD_SEC = 10
-PERIOD_LOCKING_SEC = 7
+PERIOD_GUARD_SEC = 60
+PERIOD_LOCKING_SEC = 5
 
 MENU_STATE_MAIN = 1
 MENU_STATE_BOX_LOCKING = 2
@@ -100,10 +100,10 @@ rst_pin = digitalio.DigitalInOut(board.D27)
 pin_switch = digitalio.DigitalInOut(board.D26)
 pin_switch.pull = digitalio.Pull.DOWN
 
-# pin_servo_plus = digitalio.DigitalInOut(board.D5)
-# pin_servo_minus = digitalio.DigitalInOut(board.D6)
-# pin_servo_plus.direction = digitalio.Direction.OUTPUT
-# pin_servo_minus.direction = digitalio.Direction.OUTPUT
+pin_servo_plus = digitalio.DigitalInOut(board.D5)
+pin_servo_minus = digitalio.DigitalInOut(board.D6)
+pin_servo_plus.direction = digitalio.Direction.OUTPUT
+pin_servo_minus.direction = digitalio.Direction.OUTPUT
 
 temp_sensor_internal = adafruit_dht.DHT11(board.D23)
 temp_sensor_external = adafruit_dht.DHT11(board.D24)
@@ -298,16 +298,7 @@ def disp_ai_processing(text = ''):
     try:
         disp_title()
 
-        # if box.isOpen == True:  #여는중
-        #     text_locking = f"상자를 여는중입니다."    
-        # else:   #닫는중
-        #     text_locking = f"상자를 닫는중입니다."
-
-        # text_waiting = f"잠시만 기다려주세요."    
-
         draw.text((0, FONT_HEIGHT_MAIN), "AI가 음식을 분석하는 중입니다.", font=font, fill="#FFFFFF")
-        # draw.text((0, FONT_HEIGHT_MAIN), text_locking, font=font, fill="#FFFFFF")
-        # draw.text((0, FONT_HEIGHT_MAIN * 2), text_waiting, font=font, fill="#FFFFFF")
 
     except RuntimeError:
         pass
@@ -568,8 +559,12 @@ class TimeLockedBox:
             self.isOpen = False
             self.last_closed_time = current_time
             self.unlock_date = datetime.now() + timedelta(seconds=PERIOD_LOCK_SEC)
+            pin_servo_plus.value = True
+            pin_servo_minus.value = False
         else:
             print("상자가 열렸습니다.")
+            pin_servo_plus.value = False
+            pin_servo_minus.value = True
             self.isOpen = True
 
 
@@ -635,7 +630,6 @@ try:
             if (current_time - box.locking_start_time).total_seconds() > PERIOD_LOCKING_SEC:
                 menu_state = MENU_STATE_MAIN
 
-        # pin_servo_plus.value = True    
         on_switch_main()
 
         # time.sleep(0.01)
